@@ -479,6 +479,8 @@ module EVM
 // sort of the opcode. Some of them require an argument to be interpereted as an
 // address (modulo 160 bits), so the `#addr?` function performs that check.
 
+// TUTORIAL: Fill in the semantics of `#exec` for a `TOP:TernStackOp`.
+
 
     syntax InternalOp ::= UnStackOp Int
                         | BinStackOp Int Int
@@ -487,7 +489,6 @@ module EVM
  // -------------------------------------------------
     rule <k> #exec [ UOP:UnStackOp   => UOP #addr?(UOP, W0)          ] ... </k> <wordStack> W0 : WS                => WS </wordStack>
     rule <k> #exec [ BOP:BinStackOp  => BOP #addr?(BOP, W0) W1       ] ... </k> <wordStack> W0 : W1 : WS           => WS </wordStack>
-    rule <k> #exec [ TOP:TernStackOp => TOP #addr?(TOP, W0) W1 W2    ] ... </k> <wordStack> W0 : W1 : W2 : WS      => WS </wordStack>
     rule <k> #exec [ QOP:QuadStackOp => QOP #addr?(QOP, W0) W1 W2 W3 ] ... </k> <wordStack> W0 : W1 : W2 : W3 : WS => WS </wordStack>
 
     syntax Int ::= "#addr?" "(" OpCode "," Int ")" [function]
@@ -762,6 +763,8 @@ module EVM
 // instead. This makes reasoning about `MLOAD` and `MSTORE` much simpler to reason
 // about (we do not have to chop up a word into 32 bytes/reassemble it).
 
+// TUTORIAL: Fill in the semantics of `MSTORE` when not in `EVMPRIME` mode.
+
 
     syntax UnStackOp ::= "MLOAD"
  // ----------------------------
@@ -786,11 +789,6 @@ module EVM
 
     syntax BinStackOp ::= "MSTORE"
  // ------------------------------
-    rule <mode> EXECMODE </mode>
-         <k> MSTORE INDEX VALUE => . ... </k>
-         <localMem> LM => LM [ INDEX := #padToWidth(32, #asByteStack(VALUE)) ] </localMem>
-      requires EXECMODE =/=K EVMPRIME
-
     rule <mode> EVMPRIME </mode>
          <k> MSTORE INDEX VALUE => . ... </k>
          <localMem> LM => LM [ INDEX <- VALUE ] </localMem>
@@ -810,6 +808,9 @@ module EVM
     rule <mode> EVMPRIME </mode>
          <k> MSTORE8 _ _ => #exception ... </k>
 
+
+// TUTORIAL: Add high-level opcodes `WMLOAD` and `WMSTORE` for word-aligned `MLOAD`
+// and `MSTORE`.
 
 // ### Expressions
 
@@ -880,19 +881,20 @@ module EVM
 
 // These operators make queries about the current execution state.
 
+// TUTORIAL: Fill in the semantics of `GASLIMIT`, `NUMBER`, `MSIZE`, and `CODECOPY`
+// (`CODECOPY` only when not in `EVMPRIME` mode).
+
 
     syntax NullStackOp ::= "PC" | "GAS" | "GASPRICE" | "GASLIMIT"
  // -------------------------------------------------------------
     rule <k> PC       => PCOUNT ~> #push ... </k> <pc> PCOUNT </pc>
     rule <k> GAS      => GAVAIL ~> #push ... </k> <gas> GAVAIL </gas>
     rule <k> GASPRICE => GPRICE ~> #push ... </k> <gasPrice> GPRICE </gasPrice>
-    rule <k> GASLIMIT => GLIMIT ~> #push ... </k> <gasLimit> GLIMIT </gasLimit>
 
     syntax NullStackOp ::= "COINBASE" | "TIMESTAMP" | "NUMBER" | "DIFFICULTY"
  // -------------------------------------------------------------------------
     rule <k> COINBASE   => CB   ~> #push ... </k> <coinbase> CB </coinbase>
     rule <k> TIMESTAMP  => TS   ~> #push ... </k> <timestamp> TS </timestamp>
-    rule <k> NUMBER     => NUMB ~> #push ... </k> <number> NUMB </number>
     rule <k> DIFFICULTY => DIFF ~> #push ... </k> <difficulty> DIFF </difficulty>
 
     syntax NullStackOp ::= "ADDRESS" | "ORIGIN" | "CALLER" | "CALLVALUE"
@@ -904,7 +906,6 @@ module EVM
 
     syntax NullStackOp ::= "MSIZE"
  // ------------------------------
-    rule <k> MSIZE => 32 *Word MU ~> #push ... </k> <memoryUsed> MU </memoryUsed>
 
     syntax NullStackOp ::= "CODESIZE"
  // ---------------------------------
@@ -917,12 +918,6 @@ module EVM
 
     syntax TernStackOp ::= "CODECOPY"
  // ---------------------------------
-    rule <mode> EXECMODE </mode>
-         <k> CODECOPY MEMSTART PGMSTART WIDTH => . ... </k>
-         <program> PGM </program>
-         <localMem> LM => LM [ MEMSTART := #asmOpCodes(#asOpCodes(PGM)) [ PGMSTART .. WIDTH ] ] </localMem>
-      requires EXECMODE =/=K EVMPRIME
-
     rule <mode> EVMPRIME </mode>
          <k> CODECOPY _ _ _ => #exception ... </k>
 
@@ -935,6 +930,8 @@ module EVM
 
 // The `JUMP*` family of operations affect the current program counter.
 
+// TUTORIAL: Fill in the semantics of `JUMPI`.
+
 
     syntax NullStackOp ::= "JUMPDEST"
  // ---------------------------------
@@ -946,8 +943,6 @@ module EVM
 
     syntax BinStackOp ::= "JUMPI"
  // -----------------------------
-    rule <k> JUMPI DEST I => . ... </k> <pc> _      => DEST          </pc> requires I =/=K 0
-    rule <k> JUMPI DEST 0 => . ... </k> <pc> PCOUNT => PCOUNT +Int 1 </pc>
 
 
 // ### `STOP` and `RETURN`
@@ -1016,19 +1011,11 @@ module EVM
 // specified. For now, I assume that they instantiate an empty account and use the
 // empty data.
 
+// TUTORIAL: Fill in the semantics of `BALANCE`.
+
 
     syntax UnStackOp ::= "BALANCE"
  // ------------------------------
-    rule <k> BALANCE ACCT => BAL ~> #push ... </k>
-         <account>
-           <acctID> ACCT </acctID>
-           <balance> BAL </balance>
-           ...
-         </account>
-
-    rule <k> BALANCE ACCT => #newAccount ACCT ~> 0 ~> #push ... </k>
-         <activeAccounts> ACCTS </activeAccounts>
-      requires notBool ACCT in ACCTS
 
     syntax UnStackOp ::= "EXTCODESIZE"
  // ----------------------------------
@@ -1079,6 +1066,8 @@ module EVM
 
 // These operations interact with the account storage.
 
+// TUTORIAL: Fill in the semantics of `SSTORE`.
+
 
     syntax UnStackOp ::= "SLOAD"
  // ----------------------------
@@ -1100,33 +1089,6 @@ module EVM
 
     syntax BinStackOp ::= "SSTORE"
  // ------------------------------
-    rule <k> SSTORE INDEX 0 => . ... </k>
-         <id> ACCT </id>
-         <account>
-           <acctID> ACCT </acctID>
-           <storage> ... (INDEX |-> VALUE => .Map) ... </storage>
-           ...
-         </account>
-         <refund> R => R +Word Rsstoreclear < SCHED > </refund>
-         <schedule> SCHED </schedule>
-
-    rule <k> SSTORE INDEX 0 => . ... </k>
-         <id> ACCT </id>
-         <account>
-           <acctID> ACCT </acctID>
-           <storage> STORAGE </storage>
-           ...
-         </account>
-      requires notBool (INDEX in_keys(STORAGE))
-
-    rule <k> SSTORE INDEX VALUE => . ... </k>
-         <id> ACCT </id>
-         <account>
-           <acctID> ACCT </acctID>
-           <storage> STORAGE => STORAGE [ INDEX <- VALUE ] </storage>
-           ...
-         </account>
-      requires VALUE =/=K 0
 
 
 // ### Call Operations
@@ -1390,6 +1352,8 @@ module EVM
 // -   `#memoryUsageUpdate` is the function `M` in appendix H of the yellowpaper
 //     which helps track the memory used.
 
+// TUTORIAL: Fill in the semantics of `#memory` for `RETURN`.
+
 
     syntax Int ::= #memory ( OpCode , Int ) [function]
  // --------------------------------------------------
@@ -1405,7 +1369,6 @@ module EVM
     rule #memory ( CALLDATACOPY START _ WIDTH  , MU ) => #memoryUsageUpdate(MU, START, WIDTH)
 
     rule #memory ( CREATE _ START WIDTH , MU ) => #memoryUsageUpdate(MU, START, WIDTH)
-    rule #memory ( RETURN START WIDTH   , MU ) => #memoryUsageUpdate(MU, START, WIDTH)
 
     rule #memory ( COP:CallOp     _ _ _ ARGSTART ARGWIDTH RETSTART RETWIDTH , MU ) => #memoryUsageUpdate(#memoryUsageUpdate(MU, ARGSTART, ARGWIDTH), RETSTART, RETWIDTH)
     rule #memory ( CSOP:CallSixOp _ _   ARGSTART ARGWIDTH RETSTART RETWIDTH , MU ) => #memoryUsageUpdate(#memoryUsageUpdate(MU, ARGSTART, ARGWIDTH), RETSTART, RETWIDTH)
@@ -1489,6 +1452,8 @@ module EVM
 // -   `#gasExec` loads all the relevant surronding state and uses that to compute
 //     the intrinsic execution gas of each opcode.
 
+// TUTORIAL: Fill in the semantics of `#gasExec` for `EXP`, `JUMPDEST`, and `LOG`.
+
 
     syntax InternalOp ::= #gasExec ( Schedule , OpCode )
  // ----------------------------------------------------
@@ -1500,14 +1465,9 @@ module EVM
            ...
          </account>
 
-    rule <k> #gasExec(SCHED, EXP W0 0)  => Gexp < SCHED > ... </k>
-    rule <k> #gasExec(SCHED, EXP W0 W1) => Gexp < SCHED > +Int (Gexpbyte < SCHED > *Int (1 +Int (log256Int(W1)))) ... </k> requires W1 =/=K 0
-
     rule <k> #gasExec(SCHED, CALLDATACOPY  _ _ WIDTH) => Gverylow     < SCHED > +Int (Gcopy < SCHED > *Int (WIDTH up/Int 32)) ... </k>
     rule <k> #gasExec(SCHED, CODECOPY      _ _ WIDTH) => Gverylow     < SCHED > +Int (Gcopy < SCHED > *Int (WIDTH up/Int 32)) ... </k>
     rule <k> #gasExec(SCHED, EXTCODECOPY _ _ _ WIDTH) => Gextcodecopy < SCHED > +Int (Gcopy < SCHED > *Int (WIDTH up/Int 32)) ... </k>
-
-    rule <k> #gasExec(SCHED, LOG(N) _ WIDTH) => (Glog < SCHED > +Int (Glogdata < SCHED > *Int WIDTH) +Int (N *Int Glogtopic < SCHED >)) ... </k>
 
     rule <k> #gasExec(SCHED, COP:CallOp     GCAP ACCTTO VALUE _ _ _ _) => Ccall(SCHED, ACCTTO, ACCTS, GCAP, GAVAIL, VALUE) ... </k> <activeAccounts> ACCTS </activeAccounts> <gas> GAVAIL </gas>
     rule <k> #gasExec(SCHED, CSOP:CallSixOp GCAP ACCTTO       _ _ _ _) => Ccall(SCHED, ACCTTO, ACCTS, GCAP, GAVAIL, 0)     ... </k> <activeAccounts> ACCTS </activeAccounts> <gas> GAVAIL </gas>
@@ -1517,7 +1477,6 @@ module EVM
 
     rule <k> #gasExec(SCHED, SHA3 _ WIDTH) => Gsha3 < SCHED > +Int (Gsha3word < SCHED > *Int (WIDTH up/Int 32)) ... </k>
 
-    rule <k> #gasExec(SCHED, JUMPDEST) => Gjumpdest < SCHED > ... </k>
     rule <k> #gasExec(SCHED, SLOAD _)  => Gsload    < SCHED > ... </k>
 
     // Wzero
