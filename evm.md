@@ -736,19 +736,57 @@ Some operators don't calculate anything, they just push the stack around a bit.
 
 These operations are getters/setters of the local execution memory.
 
+In mode `EVMPRIME`, the opcodes `MLOAD` and `MSTORE` are always assumed to be word-aligned.
+If the write/read is not word-aligned, an exception is thrown instead.
+This makes reasoning about `MLOAD` and `MSTORE` much simpler to reason about (we do not have to chop up a word into 32 bytes/reassemble it).
+
 ```{.k .uiuck .rvk}
     syntax UnStackOp ::= "MLOAD"
  // ----------------------------
-    rule <k> MLOAD INDEX => #asWord(#range(LM, INDEX, 32)) ~> #push ... </k>
+    rule <mode> EXECMODE </mode>
+         <k> MLOAD INDEX => #asWord(#range(LM, INDEX, 32)) ~> #push ... </k>
          <localMem> LM </localMem>
+      requires EXECMODE =/=K EVMPRIME
 
-    syntax BinStackOp ::= "MSTORE" | "MSTORE8"
- // ------------------------------------------
-    rule <k> MSTORE INDEX VALUE => . ... </k>
+    rule <mode> EVMPRIME </mode>
+         <k> MLOAD INDEX => VALUE ~> #push ... </k>
+         <localMem> ... INDEX |-> VALUE ... </localMem>
+      requires INDEX %Int 32 ==K 0
+
+    rule <mode> EVMPRIME </mode>
+         <k> MLOAD INDEX => 0 ~> #push ... </k>
+         <localMem> LM </localMem>
+      requires INDEX %Int 32 ==K 0 andBool notBool (INDEX in_keys(LM))
+
+    rule <mode> EVMPRIME </mode>
+         <k> MLOAD INDEX => #exception ... </k>
+      requires INDEX %Int 32 =/=K 0
+
+    syntax BinStackOp ::= "MSTORE"
+ // ------------------------------
+    rule <mode> EXECMODE </mode>
+         <k> MSTORE INDEX VALUE => . ... </k>
          <localMem> LM => LM [ INDEX := #padToWidth(32, #asByteStack(VALUE)) ] </localMem>
+      requires EXECMODE =/=K EVMPRIME
 
-    rule <k> MSTORE8 INDEX VALUE => . ... </k>
-         <localMem> LM => LM [ INDEX <- (VALUE %Int 256) ]    </localMem>
+    rule <mode> EVMPRIME </mode>
+         <k> MSTORE INDEX VALUE => . ... </k>
+         <localMem> LM => LM [ INDEX <- VALUE ] </localMem>
+      requires INDEX %Int 32 ==K 0
+
+    rule <mode> EVMPRIME </mode>
+         <k> MSTORE INDEX VALUE => #exception ... </k>
+      requires INDEX %Int 32 =/=K 0
+
+    syntax BinStackOp ::= "MSTORE8"
+ // -------------------------------
+    rule <mode> EXECMODE </mode>
+         <k> MSTORE8 INDEX VALUE => . ... </k>
+         <localMem> LM => LM [ INDEX <- (VALUE %Int 256) ] </localMem>
+      requires EXECMODE =/=K EVMPRIME
+
+    rule <mode> EVMPRIME </mode>
+         <k> MSTORE8 _ _ => #exception ... </k>
 ```
 
 ### Expressions
