@@ -9,7 +9,7 @@ endif
 ## Common to all versions of K
 
 defn_dir=.build/${K_VERSION}
-defn_files=${defn_dir}/ethereum.k ${defn_dir}/data.k ${defn_dir}/evm.k ${defn_dir}/analysis.k ${defn_dir}/krypto.k
+defn_files=${defn_dir}/ethereum.k ${defn_dir}/data.k ${defn_dir}/evm.k ${defn_dir}/krypto.k ${defn_dir}/evm-prime.k ${defn_dir}/analysis.k
 
 all: build split-tests proofs
 proofs: proofs/token-correct-transfer-spec.k \
@@ -57,6 +57,10 @@ tests/%/make.timestamp: tests/ethereum-tests/%.json
 	mkdir -p $(dir $@)
 	tests/split-test.py $< $(dir $@)
 	touch $@
+
+demo: evm-prime.md
+	@echo "==  tangle: tests/evm-prime/demo.evm"
+	pandoc-tangle --from markdown --to code-k --code demo evm-prime.md > tests/evm-prime/demo.evm
 
 ######################################################################
 ## UIUC K Specific Code

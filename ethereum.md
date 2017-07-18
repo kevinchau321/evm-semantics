@@ -6,10 +6,12 @@ Actual execution of the EVM is defined in [the EVM file](evm.md).
 
 ```{.k .uiuck .rvk}
 requires "evm.k"
+requires "evm-prime.k"
 requires "analysis.k"
 
 module ETHEREUM-SIMULATION
     imports EVM
+    imports EVM-PRIME
     imports EVM-ANALYSIS
 ```
 
@@ -86,14 +88,23 @@ To do so, we'll extend sort `JSON` with some EVM specific syntax, and provide a 
     rule <k> #exception ~> flush => #finalize ~> #exception ... </k>
 ```
 
+-   `compile` will run the various compiler passes over the currently loaded program.
+
+```{.k .uiuck .rvk}
+    syntax EthereumCommand ::= "compile"
+ // ------------------------------------
+    rule <mode> EVMPRIME </mode> <k> compile => . ... </k>
+         <program> PGM => #asMapOpCodes(#compile(#asOpCodes(PGM))) </program>
+```
+
 -   `exception` only clears from the `k` cell if there is an exception on the `op` cell.
 -   `failure_` holds the name of a test that failed if a test does fail.
 
 ```{.k .uiuck .rvk}
     syntax EthereumCommand ::= "exception" | "failure" String | "success"
- // ---------------------------------------------------------
+ // ---------------------------------------------------------------------
     rule <k> #exception ~> exception => . ... </k>
-    rule <k> success => . ... </k> <exit-code> _ => 0 </exit-code>
+    rule <k> success => clear ... </k> <exit-code> _ => 0 </exit-code>
     rule failure _ => .
 ```
 
@@ -105,11 +116,14 @@ To do so, we'll extend sort `JSON` with some EVM specific syntax, and provide a 
     syntax EthereumCommand ::= "run" JSON
  // -------------------------------------
     rule run { .JSONList } => .
-    rule run { TESTID : (TEST:JSON) , TESTS }
-      => run (TESTID : TEST)
-      ~> #if #hasPost?( TEST ) #then .K #else exception #fi
-      ~> clear
-      ~> run { TESTS }
+    rule <k> run { TESTID : (TEST:JSON) , TESTS }
+          => run (TESTID : TEST)
+          ~> #if #hasPost?( TEST ) #then .K #else exception #fi
+          ~> clear
+          ~> run { TESTS }
+         ...
+         </k>
+         <exit-code> _ => 1 </exit-code>
 
     syntax Bool ::= "#hasPost?" "(" JSON ")" [function]
  // ---------------------------------------------------
@@ -347,13 +361,14 @@ Here we check the other post-conditions associated with an EVM test.
  // ------------------------------------------------------------------------------
     rule check "gas" : ((GLEFT:String) => #parseWord(GLEFT))
     rule <k> check "gas" : GLEFT => . ... </k> <gas> GLEFT </gas>
-```
 
-```{.k .uiuck .rvk}
     rule check TESTID : { "callcreates" : CCREATES } => check "callcreates" : CCREATES ~> failure TESTID
  // ----------------------------------------------------------------------------------------------------
     rule check "callcreates" : { ("data" : (DATA:String)) , ("destination" : (ACCTTO:String)) , ("gasLimit" : (GLIMIT:String)) , ("value" : (VAL:String)) , .JSONList }
       => check "callcreates" : { #parseAddr(ACCTTO) | #parseWord(GLIMIT) | #parseWord(VAL) | #parseByteStack(DATA) }
     rule <k> check "callcreates" : C:Call => . ... </k> <callLog> CL </callLog> requires C in CL
+
+    rule <k> check "program" : (PGM:OpCodes => #asMapOpCodes(PGM)) ... </k>
+    rule <k> check "program" : (PGM:Map) => . ... </k> <program> PGM </program>
 endmodule
 ```

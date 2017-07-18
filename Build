@@ -6,7 +6,6 @@ set -u      # Using undefined variables is an error. Exit immediately
 # Settings
 # --------
 
-tests_dir="tests/VMTests/"
 expected_passing="tests/short-list"
 long_running="tests/long-running"
 now_passing="tests/passing.lastrun"
@@ -59,6 +58,7 @@ krun_with_opts() {
     case "$test_file" in
        *gas-analysis/*) test_opts=( -cMODE=GASANALYZE "$test_file" );;
        *VMTests/*     ) test_opts=( -cMODE=VMTESTS    "$test_file" );;
+       *evm-prime/*   ) test_opts=( -cMODE=EVMPRIME   "$test_file" );;
        *proofs/*      ) set_test_opts_for_proofs "$test_file"; lint=cat;;
        *              ) die "Don't know how to set test_opts for '$test_file'";;
     esac
@@ -116,7 +116,8 @@ filter_tests() {
 }
 
 list_gas_analysis() { find "tests/gas-analysis" -name '*.evm'; }
-list_vmtests()      { find "$tests_dir"         -name '*.json'; }
+list_evm_prime()    { find "tests/evm-prime"    -name '*.evm'; }
+list_vmtests()      { find "tests/VMTests"      -name '*.json'; }
 list_proofs()       { find "proofs/"            -name '*-spec.k'; }
 list_short() {
     if [[ "$#" -gt 0 ]]; then
@@ -254,8 +255,8 @@ run_command="$1" && shift
 case "$run_command" in
 
     # Building
-    all)           run_make all ;;
-    defn)          run_make defn ;;
+    all)  run_make all ;;
+    defn) run_make defn ;;
 
     # Running
     krun)          with_test_list list_tests run_krun     "$@" ;;
@@ -269,12 +270,14 @@ case "$run_command" in
     list-rv-jenkins) with_test_list list_rv_jenkins echo "$@" ;;
     list-short)      with_test_list "list_short $@" echo      ;;
     list-analysis)   with_test_list list_analysis   echo "$@" ;;
+    list-evm-prime)  with_test_list list_evm_prime  echo "$@" ;;
 
     # Test runs
     test)       with_test_list list_tests      run_tests "$@" ;;
     rv-jenkins) with_test_list list_rv_jenkins run_tests "$@" ;;
     short)      with_test_list "list_short $@" run_tests      ;;
     quicktest)  with_test_list list_quicktests run_tests "$@" ;;
+    evm-prime)  run_make demo ; with_test_list list_evm_prime  run_tests "$@" ;;
 
     # Git CI
     ci-init)    init_gitci ;;
@@ -297,7 +300,8 @@ case "$run_command" in
        $0 list-tests <regx>     List passing and failing tests
        $0 list-rv-jenkins       List 8000 random tests (excluding performance tests)
        $0 list-short [N]        List the Nth short testsuite (ommitting N lists all)
-       $0 list-analysis <regx>  List the analysis tests
+       $0 list-analysis  <regx> List the analysis tests
+       $0 list-evm-prime <regx> List the evm-prime tests
 
        $0 test <regx>           Run passing and unknown tests
        $0 rv-jenkins            Run 8000 random tests (excluding performance tests)
@@ -306,5 +310,6 @@ case "$run_command" in
 
        $0 ci-init               Initialize CI on the repo
        $0 ci <exp>              Run CI test <exp>
+       $0 evm-prime <regx>      Run the matching evm-prime tests
 "; exit ;;
 esac
